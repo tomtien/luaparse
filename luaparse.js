@@ -319,6 +319,15 @@
       };
     }
 
+    ,compoundAssignmentStatement: function(variables, init, operator) {
+      return {
+          type: 'CompoundAssignmentStatement'
+        ,  operator: operator
+        , variables: variables
+        , init: init
+      };
+    }
+
     , callStatement: function(expression) {
       return {
           type: 'CallStatement'
@@ -443,6 +452,14 @@
     , indexExpression: function(base, index) {
       return {
           type: 'IndexExpression'
+        , base: base
+        , index: index
+      };
+    }
+
+    , optionalIndexExpression: function(base, index) {
+      return {
+          type: 'OptionalIndexExpression'
         , base: base
         , index: index
       };
@@ -742,8 +759,9 @@
 
       case 61: // =
         if (61 === next) return scanPunctuator('==');
-        return scanPunctuator('=');
 
+        return scanPunctuator('=');
+      
       case 62: // >
         if (features.bitwiseOperators)
           if (62 === next) return scanPunctuator('>>');
@@ -774,18 +792,42 @@
 
       case 47: // /
         // Check for integer division op (//)
+        if(features.compoundAssignments){
+          //todo added
+          if(61 === next) return scanPunctuator("/=");
+        }
         if (features.integerDivision)
           if (47 === next) return scanPunctuator('//');
         return scanPunctuator('/');
 
-      case 38: case 124: // & |
-        if (!features.bitwiseOperators)
-          break;
 
+      case 63:
+        if(features.optionalChaining){
+          if(46 === next) return scanPunctuator('?.');
+          if(91 === next) return scanPunctuator('?[');
+        }
+      break
+
+      
         /* fall through */
-      case 42: case 94: case 37: case 44: case 123: case 125:
-      case 93: case 40: case 41: case 59: case 35: case 45:
-      case 43: // * ^ % , { } ] ( ) ; # - +
+      case 43:
+        if(features.compoundAssignments ) {
+          if(61 === next) return scanPunctuator("+=")
+        };
+      case 45: 
+        if(features.compoundAssignments ) {
+          if(61 === next) return scanPunctuator("-=")
+        };
+      case 42: 
+        if(features.compoundAssignments ) {
+          if(61 === next) return scanPunctuator("*=")
+        };
+      case 38: case 124: // & |
+        if (!features.bitwiseOperators) break;
+      case 94: case 37: case 44: case 123: case 125:
+      case 93: case 40: case 41: case 59: case 35:
+       // * ^ % , { } ] ( ) ; # - +
+
         return scanPunctuator(input.charAt(index));
     }
 
@@ -2151,7 +2193,6 @@
       }
 
       both: for (;;) {
-        var newBase;
 
         switch (StringLiteral === token.type ? '"' : token.value) {
         case '.':
@@ -2189,10 +2230,25 @@
     } else if (!lvalue) {
       return unexpected(token);
     }
+    var values = [];
+
+    if(token.value === '+=' || token.value === '-=' ||  
+      token.value === '*=' || token.value === '/=' 
+
+    ){
+      const operator = token.value;
+      next();
+      do {
+        values.push(parseExpectedExpression(flowContext));
+      } while (consume(','));
+      pushLocation(startMarker);
+      return finishNode(ast.compoundAssignmentStatement(targets, values, operator));
+    }
+    
 
     expect('=');
 
-    var values = [];
+
 
     do {
       values.push(parseExpectedExpression(flowContext));
@@ -2486,6 +2542,17 @@
           next();
           identifier = parseIdentifier();
           return finishNode(ast.memberExpression(base, '.', identifier));
+        case '?.':
+          pushLocation(marker);
+          next();
+          identifier = parseIdentifier();
+          return finishNode(ast.memberExpression(base, '?.', identifier));
+        case '?[':
+          pushLocation(marker);
+          next();
+          expression = parseExpectedExpression(flowContext);
+          expect(']');
+          return finishNode(ast.optionalIndexExpression(base, expression));
         case ':':
           pushLocation(marker);
           next();
@@ -2653,6 +2720,20 @@
       integerDivision: true,
       relaxedBreak: true
     },
+    '5.4':{
+      labels: true,
+      emptyStatement: true,
+      hexEscapes: true,
+      skipWhitespaceEscape: true,
+      strictEscapes: true,
+      unicodeEscapes: true,
+      bitwiseOperators: true,
+      integerDivision: true,
+      relaxedBreak: true,
+      compoundAssignments: true,
+      optionalChaining: true
+    },
+
     'LuaJIT': {
       // XXX: LuaJIT language features may depend on compilation options; may need to
       // rethink how to handle this. Specifically, there is a LUAJIT_ENABLE_LUA52COMPAT
