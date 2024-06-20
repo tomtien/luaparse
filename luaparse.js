@@ -1,7 +1,6 @@
 /* global exports:true, module:true, require:true, define:true, global:true */
 
-(function (root, name, factory) {
-  'use strict';
+(((root, name, factory) => {
 
   // Used to determine if values are of the language type `Object`
   var objectTypes = {
@@ -50,7 +49,7 @@
   else {
     factory((root[name] = {}));
   }
-}(this, 'luaparse', function (exports) {
+})(this, 'luaparse', function (exports) {
   'use strict';
 
   exports.version = "0.3.1";
@@ -106,16 +105,32 @@
         highMask | 0x80 | ((codepoint >>  6) & 0x3f),
         highMask | 0x80 | ( codepoint        & 0x3f)
       );
-    } else /* istanbul ignore else */ if (codepoint < 0x110000) {
+    } else if (codepoint < 0x200000) {
       return String.fromCharCode(
         highMask | 0xf0 |  (codepoint >> 18)        ,
         highMask | 0x80 | ((codepoint >> 12) & 0x3f),
         highMask | 0x80 | ((codepoint >>  6) & 0x3f),
         highMask | 0x80 | ( codepoint        & 0x3f)
       );
+    } else if (codepoint < 0x4000000) {
+      return String.fromCharCode(
+        highMask | 0xf8 |  (codepoint >> 24)        ,
+        highMask | 0x80 | ((codepoint >> 18) & 0x3f),
+        highMask | 0x80 | ((codepoint >> 12) & 0x3f),
+        highMask | 0x80 | ((codepoint >>  6) & 0x3f),
+        highMask | 0x80 | ( codepoint        & 0x3f)
+      );
+    } else /* istanbul ignore else */ if (codepoint <= 0x7fffffff) {
+      return String.fromCharCode(
+        highMask | 0xfc |  (codepoint >> 30)        ,
+        highMask | 0x80 | ((codepoint >> 24) & 0x3f),
+        highMask | 0x80 | ((codepoint >> 18) & 0x3f),
+        highMask | 0x80 | ((codepoint >> 12) & 0x3f),
+        highMask | 0x80 | ((codepoint >>  6) & 0x3f),
+        highMask | 0x80 | ( codepoint        & 0x3f)
+      );
     } else {
-      // TODO: Lua 5.4 allows up to six-byte sequences, as in UTF-8:1993
-      return null;
+      throw new Error('Should not happen');
     }
   }
 
@@ -150,7 +165,19 @@
         return encodeUTF8(codepoint);
       },
     },
-
+    'utf8': {
+      fixup:  function (s) {
+        return s;
+      },
+      encodeByte: function (value) {
+        if (value === null)
+          return '';
+        return String.fromCharCode(value);
+      },
+      encodeUTF8: function (codepoint) {
+        return encodeUTF8(codepoint);
+      },
+    },
     // `x-user-defined` encoding mode: assume the input was decoded with the WHATWG `x-user-defined` encoding
     'x-user-defined': {
       fixup: checkChars(/[^\x00-\x7f\uf780-\uf7ff]/),
@@ -741,7 +768,7 @@
     if (isIdentifierStart(charCode)) return scanIdentifierOrKeyword();
 
     switch (charCode) {
-      case 39: case 34: // '"
+      case 39: case 34: case 96: // '"
         return scanStringLiteral();
 
       case 48: case 49: case 50: case 51: case 52: case 53:
@@ -959,7 +986,17 @@
     if (!encodingMode.discardStrings) {
       string += encodingMode.encodeByte(null);
       string += encodingMode.fixup(input.slice(stringStart, index - 1));
+
+      if(features.joatHashes){
+
+        if(delimiter === 96){
+          string = joaat(string);
+        }
+  
+      }
     }
+
+
 
     return {
         type: StringLiteral
@@ -971,7 +1008,18 @@
       , range: [tokenStart, index]
     };
   }
-
+  function joaat(key) { 
+    var hash = 0;
+    for (var i = 0; i < key.length; ++i) {
+        hash += key.charCodeAt(i);
+        hash += (hash << 10);
+        hash ^= (hash >>> 6);
+    }
+    hash += (hash << 3);
+    hash ^= (hash >>> 11);
+    hash += (hash << 15);
+    return (hash >>> 0);
+}
   // Expect a multiline string literal and return it as a regular string
   // literal, if it doesn't validate into a valid multiline string, throw an
   // exception.
@@ -1187,7 +1235,7 @@
 
     while (isHexDigit(input.charCodeAt(index))) {
       ++index;
-      if (index - escStart > 6)
+      if (index - escStart > (features.relaxedUTF8 ? 8 : 6))
         raise(null, errors.tooLargeCodepoint, '\\' + input.slice(sequenceStart, index));
     }
 
@@ -1202,7 +1250,7 @@
     var codepoint = parseInt(input.slice(escStart, index - 1) || '0', 16);
     var frag = '\\' + input.slice(sequenceStart, index);
 
-    if (codepoint > 0x10ffff) {
+    if (codepoint > (features.relaxedUTF8 ? 0x7fffffff : 0x10ffff)) {
       raise(null, errors.tooLargeCodepoint, frag);
     }
 
@@ -2731,7 +2779,9 @@
       integerDivision: true,
       relaxedBreak: true,
       compoundAssignments: true,
-      optionalChaining: true
+      optionalChaining: true,
+      joatHashes: true,
+      relaxedUTF8: true
     },
 
     'LuaJIT': {
