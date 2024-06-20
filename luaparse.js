@@ -50,7 +50,6 @@
     factory((root[name] = {}));
   }
 })(this, 'luaparse', (exports) => {
-  'use strict';
 
   exports.version = "0.3.1";
 
@@ -142,7 +141,7 @@
   }
 
   function checkChars(rx) {
-    return function (s) {
+    return (s) => {
       var m = rx.exec(s);
       if (!m)
         return s;
@@ -1059,7 +1058,7 @@
 
     while (isHexDigit(input.charCodeAt(index))) ++index;
     // Convert the hexadecimal digit to base 10.
-    digit = parseInt(input.slice(digitStart, index), 16);
+    digit = Number.parseInt(input.slice(digitStart, index), 16);
 
     // Fraction part is optional.
     var foundFraction = false;
@@ -1073,7 +1072,7 @@
       // Empty fraction parts should default to 0, others should be converted
       // 0.x form so we can use summation at the end.
       fraction = (fractionStart === index) ? 0
-        : parseInt(fraction, 16) / Math.pow(16, index - fractionStart);
+        : Number.parseInt(fraction, 16) / Math.pow(16, index - fractionStart);
     }
 
     // Binary exponents are optional
@@ -1135,7 +1134,7 @@
     }
 
     return {
-      value: parseFloat(input.slice(tokenStart, index)),
+      value: Number.parseFloat(input.slice(tokenStart, index)),
       hasFractionPart: foundFraction || foundExponent
     };
   }
