@@ -3,7 +3,7 @@
 (((root, name, factory) => {
 
   // Used to determine if values are of the language type `Object`
-  var objectTypes = {
+  const objectTypes = {
         'function': true
       , 'object': true
     }
@@ -49,7 +49,7 @@
   else {
     factory((root[name] = {}));
   }
-})(this, 'luaparse', function (exports) {
+})(this, 'luaparse', (exports) => {
   'use strict';
 
   exports.version = "0.3.1";
@@ -156,55 +156,41 @@
     // it means true ISO/IEC 8859-1 identity-mapped to Basic Latin and Latin-1 Supplement blocks
     'pseudo-latin1': {
       fixup: checkChars(/[^\x00-\xff]/),
-      encodeByte: function (value) {
+      encodeByte: (value) => {
         if (value === null)
           return '';
         return String.fromCharCode(value);
       },
-      encodeUTF8: function (codepoint) {
-        return encodeUTF8(codepoint);
-      },
+      encodeUTF8: (codepoint) => encodeUTF8(codepoint),
     },
-    'utf8': {
-      fixup:  function (s) {
-        return s;
-      },
-      encodeByte: function (value) {
+    'utf-8': {
+      fixup:  (s) => s,
+      encodeByte: (value) => {
         if (value === null)
           return '';
         return String.fromCharCode(value);
       },
-      encodeUTF8: function (codepoint) {
-        return encodeUTF8(codepoint);
-      },
+      encodeUTF8: (codepoint) => encodeUTF8(codepoint),
     },
     // `x-user-defined` encoding mode: assume the input was decoded with the WHATWG `x-user-defined` encoding
     'x-user-defined': {
       fixup: checkChars(/[^\x00-\x7f\uf780-\uf7ff]/),
-      encodeByte: function (value) {
+      encodeByte: (value) => {
         if (value === null)
           return '';
         if (value >= 0x80)
           return String.fromCharCode(value | 0xf700);
         return String.fromCharCode(value);
       },
-      encodeUTF8: function (codepoint) {
-        return encodeUTF8(codepoint, 0xf700);
-      }
+      encodeUTF8: (codepoint) => encodeUTF8(codepoint, 0xf700)
     },
 
     // `none` encoding mode: disregard intrepretation of string literals, leave identifiers as-is
     'none': {
       discardStrings: true,
-      fixup: function (s) {
-        return s;
-      },
-      encodeByte: function (value) {
-        return '';
-      },
-      encodeUTF8: function (codepoint) {
-        return '';
-      }
+      fixup: (s) => s,
+      encodeByte: (value) => '',
+      encodeUTF8: (codepoint) => ''
     }
   };
 
@@ -253,160 +239,120 @@
   // easily be customized by overriding these functions.
 
   var ast = exports.ast = {
-      labelStatement: function(label) {
-      return {
+      labelStatement: (label) => ({
           type: 'LabelStatement'
         , label: label
-      };
-    }
+      })
 
-    , breakStatement: function() {
-      return {
+    , breakStatement: () => ({
           type: 'BreakStatement'
-      };
-    }
+      })
 
-    , gotoStatement: function(label) {
-      return {
+    , gotoStatement: (label) => ({
           type: 'GotoStatement'
         , label: label
-      };
-    }
+      })
 
-    , returnStatement: function(args) {
-      return {
+    , returnStatement: (args) => ({
           type: 'ReturnStatement'
         , 'arguments': args
-      };
-    }
+      })
 
-    , ifStatement: function(clauses) {
-      return {
+    , ifStatement: (clauses) => ({
           type: 'IfStatement'
         , clauses: clauses
-      };
-    }
-    , ifClause: function(condition, body) {
-      return {
+      })
+    , ifClause: (condition, body) => ({
           type: 'IfClause'
         , condition: condition
         , body: body
-      };
-    }
-    , elseifClause: function(condition, body) {
-      return {
+      })
+    , elseifClause: (condition, body) => ({
           type: 'ElseifClause'
         , condition: condition
         , body: body
-      };
-    }
-    , elseClause: function(body) {
-      return {
+      })
+    , elseClause: (body) => ({
           type: 'ElseClause'
         , body: body
-      };
-    }
+      })
 
-    , whileStatement: function(condition, body) {
-      return {
+    , whileStatement: (condition, body) => ({
           type: 'WhileStatement'
         , condition: condition
         , body: body
-      };
-    }
+      })
 
-    , doStatement: function(body) {
-      return {
+    , doStatement: (body) => ({
           type: 'DoStatement'
         , body: body
-      };
-    }
+      })
 
-    , repeatStatement: function(condition, body) {
-      return {
+    , repeatStatement: (condition, body) => ({
           type: 'RepeatStatement'
         , condition: condition
         , body: body
-      };
-    }
+      })
 
-    , localStatement: function(variables, init) {
-      return {
+    , localStatement: (variables, init) => ({
           type: 'LocalStatement'
         , variables: variables
         , init: init
-      };
-    }
+      })
 
-    , assignmentStatement: function(variables, init) {
-      return {
+    , assignmentStatement: (variables, init) => ({
           type: 'AssignmentStatement'
         , variables: variables
         , init: init
-      };
-    }
+      })
 
-    ,compoundAssignmentStatement: function(variables, init, operator) {
-      return {
+    ,compoundAssignmentStatement: (variables, init, operator) => ({
           type: 'CompoundAssignmentStatement'
         ,  operator: operator
         , variables: variables
         , init: init
-      };
-    }
+      })
 
-    , callStatement: function(expression) {
-      return {
+    , callStatement: (expression) => ({
           type: 'CallStatement'
         , expression: expression
-      };
-    }
+      })
 
-    , functionStatement: function(identifier, parameters, isLocal, body) {
-      return {
+    , functionStatement: (identifier, parameters, isLocal, body) => ({
           type: 'FunctionDeclaration'
         , identifier: identifier
         , isLocal: isLocal
         , parameters: parameters
         , body: body
-      };
-    }
+      })
 
-    , forNumericStatement: function(variable, start, end, step, body) {
-      return {
+    , forNumericStatement: (variable, start, end, step, body) => ({
           type: 'ForNumericStatement'
         , variable: variable
         , start: start
         , end: end
         , step: step
         , body: body
-      };
-    }
+      })
 
-    , forGenericStatement: function(variables, iterators, body) {
-      return {
+    , forGenericStatement: (variables, iterators, body) => ({
           type: 'ForGenericStatement'
         , variables: variables
         , iterators: iterators
         , body: body
-      };
-    }
+      })
 
-    , chunk: function(body) {
-      return {
+    , chunk: (body) => ({
           type: 'Chunk'
         , body: body
-      };
-    }
+      })
 
-    , identifier: function(name) {
-      return {
+    , identifier: (name) => ({
           type: 'Identifier'
         , name: name
-      };
-    }
+      })
 
-    , literal: function(type, value, raw) {
+    , literal: (type, value, raw) => {
       type = (type === StringLiteral) ? 'StringLiteral'
         : (type === NumericLiteral) ? 'NumericLiteral'
         : (type === BooleanLiteral) ? 'BooleanLiteral'
@@ -420,35 +366,27 @@
       };
     }
 
-    , tableKey: function(key, value) {
-      return {
+    , tableKey: (key, value) => ({
           type: 'TableKey'
         , key: key
         , value: value
-      };
-    }
-    , tableKeyString: function(key, value) {
-      return {
+      })
+    , tableKeyString: (key, value) => ({
           type: 'TableKeyString'
         , key: key
         , value: value
-      };
-    }
-    , tableValue: function(value) {
-      return {
+      })
+    , tableValue: (value) => ({
           type: 'TableValue'
         , value: value
-      };
-    }
+      })
 
 
-    , tableConstructorExpression: function(fields) {
-      return {
+    , tableConstructorExpression: (fields) => ({
           type: 'TableConstructorExpression'
         , fields: fields
-      };
-    }
-    , binaryExpression: function(operator, left, right) {
+      })
+    , binaryExpression: (operator, left, right) => {
       var type = ('and' === operator || 'or' === operator) ?
         'LogicalExpression' :
         'BinaryExpression';
@@ -460,70 +398,54 @@
         , right: right
       };
     }
-    , unaryExpression: function(operator, argument) {
-      return {
+    , unaryExpression: (operator, argument) => ({
           type: 'UnaryExpression'
         , operator: operator
         , argument: argument
-      };
-    }
-    , memberExpression: function(base, indexer, identifier) {
-      return {
+      })
+    , memberExpression: (base, indexer, identifier) => ({
           type: 'MemberExpression'
         , indexer: indexer
         , identifier: identifier
         , base: base
-      };
-    }
+      })
 
-    , indexExpression: function(base, index) {
-      return {
+    , indexExpression: (base, index) => ({
           type: 'IndexExpression'
         , base: base
         , index: index
-      };
-    }
+      })
 
-    , optionalIndexExpression: function(base, index) {
-      return {
+    , optionalIndexExpression: (base, index) => ({
           type: 'OptionalIndexExpression'
         , base: base
         , index: index
-      };
-    }
+      })
 
-    , callExpression: function(base, args) {
-      return {
+    , callExpression: (base, args) => ({
           type: 'CallExpression'
         , base: base
         , 'arguments': args
-      };
-    }
+      })
 
-    , tableCallExpression: function(base, args) {
-      return {
+    , tableCallExpression: (base, args) => ({
           type: 'TableCallExpression'
         , base: base
         , 'arguments': args
         , argument: args
-      };
-    }
+      })
 
-    , stringCallExpression: function(base, argument) {
-      return {
+    , stringCallExpression: (base, argument) => ({
           type: 'StringCallExpression'
         , base: base
         , argument: argument
-      };
-    }
+      })
 
-    , comment: function(value, raw) {
-      return {
+    , comment: (value, raw) => ({
           type: 'Comment'
         , value: value
         , raw: raw
-      };
-    }
+      })
   };
 
   // Wrap up the node object.
@@ -547,7 +469,7 @@
     , toString = Object.prototype.toString
     ;
 
-  var indexOf = /* istanbul ignore next */ function (array, element) {
+  var indexOf = /* istanbul ignore next */ (array, element) => {
     for (var i = 0, length = array.length; i < length; ++i) {
       if (array[i] === element) return i;
     }
@@ -556,9 +478,7 @@
 
   /* istanbul ignore else */
   if (Array.prototype.indexOf)
-    indexOf = function (array, element) {
-      return array.indexOf(element);
-    };
+    indexOf = (array, element) => array.indexOf(element);
 
   // Iterate through an array of objects and return the index of an object
   // with a matching property.
@@ -580,15 +500,13 @@
 
   function sprintf(format) {
     var args = slice.call(arguments, 1);
-    format = format.replace(/%(\d)/g, function (match, index) {
-      return '' + args[index - 1] || /* istanbul ignore next */ '';
-    });
+    format = format.replace(/%(\d)/g, (match, index) => '' + args[index - 1] || /* istanbul ignore next */ '');
     return format;
   }
 
   // Polyfill for `Object.assign`.
 
-  var assign = /* istanbul ignore next */ function (dest) {
+  var assign = /* istanbul ignore next */ (dest) => {
     var args = slice.call(arguments, 1)
       , src, prop;
 
@@ -1247,7 +1165,7 @@
         raise(null, errors.hexadecimalDigitExpected, '\\' + input.slice(sequenceStart, index));
     }
 
-    var codepoint = parseInt(input.slice(escStart, index - 1) || '0', 16);
+    var codepoint = Number.parseInt(input.slice(escStart, index - 1) || '0', 16);
     var frag = '\\' + input.slice(sequenceStart, index);
 
     if (codepoint > (features.relaxedUTF8 ? 0x7fffffff : 0x10ffff)) {
@@ -1284,7 +1202,7 @@
         while (isDecDigit(input.charCodeAt(index)) && index - sequenceStart < 3) ++index;
 
         var frag = input.slice(sequenceStart, index);
-        var ddd = parseInt(frag, 10);
+        var ddd = Number.parseInt(frag, 10);
         if (ddd > 255) {
           raise(null, errors.decimalEscapeTooLarge, '\\' + ddd);
         }
@@ -1304,7 +1222,7 @@
           if (isHexDigit(input.charCodeAt(index + 1)) &&
               isHexDigit(input.charCodeAt(index + 2))) {
             index += 3;
-            return encodingMode.encodeByte(parseInt(input.slice(sequenceStart + 1, index), 16), '\\' + input.slice(sequenceStart, index));
+            return encodingMode.encodeByte(Number.parseInt(input.slice(sequenceStart + 1, index), 16), '\\' + input.slice(sequenceStart, index));
           }
           raise(null, errors.hexadecimalDigitExpected, '\\' + input.slice(sequenceStart, index + 2));
         }
@@ -1809,11 +1727,11 @@
   LoopFlowContext.prototype.addGoto =
   LoopFlowContext.prototype.addLabel =
   /* istanbul ignore next */
-  function () { throw new Error('This should never happen'); };
+  () => { throw new Error('This should never happen'); };
 
   LoopFlowContext.prototype.addLocal =
   LoopFlowContext.prototype.raiseDeferredErrors =
-  function () {};
+  () => {};
 
   function makeFlowContext() {
     return features.labels ? new FullFlowContext() : new LoopFlowContext();
@@ -2855,9 +2773,7 @@
     if ('undefined' !== typeof _input) write(_input);
 
     // Ignore shebangs.
-    if (input && input.substr(0, 2) === '#!') input = input.replace(/^.*/, function (line) {
-      return line.replace(/./g, ' ');
-    });
+    if (input && input.substr(0, 2) === '#!') input = input.replace(/^.*/, (line) => line.replace(/./g, ' '));
 
     length = input.length;
     trackLocations = options.locations || options.ranges;
