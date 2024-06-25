@@ -264,7 +264,8 @@
 		gotoJumpInLocalScope: "<goto %1> jumps into the scope of local '%2'",
 		cannotUseVararg: "cannot use '...' outside a vararg function near '%1'",
 		invalidCodeUnit:
-			"code unit U+%1 is not allowed in the current encoding mode",
+			"code unit U+%1 is not allowed in the current encoding mode"
+		, unknownAttribute: 'unknown attribute \'%1\''
 	});
 
 	// ### Abstract Syntax Tree
@@ -369,6 +370,15 @@
 		identifier: (name) => ({
 			type: "Identifier",
 			name: name,
+		}),
+		attribute: (name) => ({
+			type: 'Attribute'
+			, name: name
+		}),
+		identifierWithAttribute: (name, attribute) => ({
+			type: 'IdentifierWithAttribute'
+			, name: name
+			, attribute: attribute
 		}),
 		literal: (type, value, raw) => {
 			const t =
@@ -933,7 +943,7 @@
 		let string = encodingMode.discardStrings ? null : "";
 		let charCode;
 
-		for (;;) {
+		for (; ;) {
 			charCode = input.charCodeAt(index++);
 			if (delimiter === charCode) break;
 			// EOF or `\n` terminates a string literal. If we haven't found the
@@ -1640,6 +1650,7 @@
 	// Attach scope information to node. If the node is global, store it in the
 	// globals array so we can return the information to the user.
 	function attachScope(node, isLocal) {
+
 		if (!isLocal && -1 === indexOfObject(globals, "name", node.name))
 			globals.push(node);
 
@@ -1733,6 +1744,17 @@
 		this.pendingGotos = [];
 	}
 
+	FullFlowContext.prototype.findLabel = function (name) {
+		let i = this.scopes.length;
+		while (i-- > 0) {
+			if (Object.prototype.hasOwnProperty.call(this.scopes[i].labels, name))
+				return this.scopes[i].labels[name];
+			if (!features.noLabelShadowing)
+				return null;
+		}
+		return null;
+	};
+
 	FullFlowContext.prototype.isInLoop = function () {
 		let i = this.scopes.length;
 		while (i-- > 0) {
@@ -1781,9 +1803,10 @@
 
 	FullFlowContext.prototype.addLabel = function (name, token) {
 		const scope = this.currentScope();
+		const definedLabel = this.findLabel(name);
 
-		if (Object.prototype.hasOwnProperty.call(scope.labels, name)) {
-			raise(token, errors.labelAlreadyDefined, name, scope.labels[name].line);
+		if (definedLabel !== null) {
+			raise(token, errors.labelAlreadyDefined, name, definedLabel.line);
 		} else {
 			const newGotos = [];
 
@@ -1791,9 +1814,7 @@
 				const theGoto = this.pendingGotos[i];
 
 				if (theGoto.maxDepth >= this.scopes.length && theGoto.target === name) {
-					if (
-						theGoto.localCounts[this.scopes.length - 1] < scope.locals.length
-					) {
+					if (theGoto.localCounts[this.scopes.length - 1] < scope.locals.length) {
 						scope.deferredGotos.push(theGoto);
 					}
 					continue;
@@ -1807,7 +1828,7 @@
 
 		scope.labels[name] = {
 			localCount: scope.locals.length,
-			line: token.line,
+			line: token.line
 		};
 	};
 
@@ -1871,7 +1892,7 @@
 		};
 
 	LoopFlowContext.prototype.addLocal =
-		LoopFlowContext.prototype.raiseDeferredErrors = () => {};
+		LoopFlowContext.prototype.raiseDeferredErrors = () => { };
 
 	function makeFlowContext() {
 		return features.labels ? new FullFlowContext() : new LoopFlowContext();
@@ -2239,9 +2260,26 @@
 	//
 	//     local ::= 'local' 'function' Name funcdecl
 	//        | 'local' Name {',' Name} ['=' exp {',' exp}]
+	function parseAttribute() {
+		markLocation();
+		if (consume('<')) {
+			const identifier = token.value;
+			if (Identifier !== token.type) raiseUnexpectedToken('<name>', token);
+
+			if (!features.attributes[identifier])
+				raise(token, errors.unknownAttribute, identifier);
+			next();
+			expect('>');
+			return finishNode(ast.attribute(identifier));
+		}
+		if (trackLocations) locations.pop();
+		return null;
+	}
 
 	function parseLocalStatement(flowContext) {
 		let name;
+		let attribute;
+		let marker;
 		const declToken = previousToken;
 
 		if (Identifier === token.type) {
@@ -2249,9 +2287,21 @@
 			const init = [];
 
 			do {
+				if (trackLocations) marker = createLocationMarker();
 				name = parseIdentifier();
 
-				variables.push(name);
+				attribute = null;
+				if (features.attributes) {
+					attribute = parseAttribute();
+				}
+
+				if (attribute !== null) {
+					if (trackLocations) pushLocation(marker);
+					variables.push(finishNode(ast.identifierWithAttribute(name.name, attribute)));
+					// console.log(variables);
+				} else {
+					variables.push(name);
+				}
 				flowContext.addLocal(name.name, declToken);
 			} while (consume(","));
 
@@ -2328,7 +2378,7 @@
 				return unexpected(token);
 			}
 
-			both: for (;;) {
+			both: for (; ;) {
 				switch (StringLiteral === token.type ? '"' : token.value) {
 					case ".":
 					case "[":
@@ -2759,7 +2809,7 @@
 		}
 
 		// The suffix
-		for (;;) {
+		for (; ;) {
 			const newBase = parsePrefixExpressionPart(base, marker, flowContext);
 			if (newBase === null) break;
 			base = newBase;
@@ -2876,8 +2926,8 @@
 	exports.parse = parse;
 
 	const versionFeatures = {
-		5.1: {},
-		5.2: {
+		"5.1": {},
+		"5.2": {
 			labels: true,
 			emptyStatement: true,
 			hexEscapes: true,
@@ -2885,7 +2935,7 @@
 			strictEscapes: true,
 			relaxedBreak: true,
 		},
-		5.3: {
+		"5.3": {
 			labels: true,
 			emptyStatement: true,
 			hexEscapes: true,
@@ -2896,7 +2946,7 @@
 			integerDivision: true,
 			relaxedBreak: true,
 		},
-		5.4: {
+		"5.4": {
 			labels: true,
 			emptyStatement: true,
 			hexEscapes: true,
@@ -2910,6 +2960,8 @@
 			optionalChaining: true,
 			joatHashes: true,
 			relaxedUTF8: true,
+			noLabelShadowing: true,
+			attributes: { 'const': true, 'close': true },
 		},
 
 		LuaJIT: {
