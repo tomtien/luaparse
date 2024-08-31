@@ -264,8 +264,8 @@
 		gotoJumpInLocalScope: "<goto %1> jumps into the scope of local '%2'",
 		cannotUseVararg: "cannot use '...' outside a vararg function near '%1'",
 		invalidCodeUnit:
-			"code unit U+%1 is not allowed in the current encoding mode"
-		, unknownAttribute: 'unknown attribute \'%1\''
+			"code unit U+%1 is not allowed in the current encoding mode",
+		unknownAttribute: "unknown attribute '%1'",
 	});
 
 	// ### Abstract Syntax Tree
@@ -367,18 +367,19 @@
 			type: "Chunk",
 			body: body,
 		}),
-		identifier: (name) => ({
+		identifier: (name, isIndex) => ({
 			type: "Identifier",
+			isIndex: isIndex,
 			name: name,
 		}),
 		attribute: (name) => ({
-			type: 'Attribute'
-			, name: name
+			type: "Attribute",
+			name: name,
 		}),
 		identifierWithAttribute: (name, attribute) => ({
-			type: 'IdentifierWithAttribute'
-			, name: name
-			, attribute: attribute
+			type: "IdentifierWithAttribute",
+			name: name,
+			attribute: attribute,
 		}),
 		literal: (type, value, raw) => {
 			const t =
@@ -943,7 +944,7 @@
 		let string = encodingMode.discardStrings ? null : "";
 		let charCode;
 
-		for (; ;) {
+		for (;;) {
 			charCode = input.charCodeAt(index++);
 			if (delimiter === charCode) break;
 			// EOF or `\n` terminates a string literal. If we haven't found the
@@ -1650,7 +1651,6 @@
 	// Attach scope information to node. If the node is global, store it in the
 	// globals array so we can return the information to the user.
 	function attachScope(node, isLocal) {
-
 		if (!isLocal && -1 === indexOfObject(globals, "name", node.name))
 			globals.push(node);
 
@@ -1749,8 +1749,7 @@
 		while (i-- > 0) {
 			if (Object.prototype.hasOwnProperty.call(this.scopes[i].labels, name))
 				return this.scopes[i].labels[name];
-			if (!features.noLabelShadowing)
-				return null;
+			if (!features.noLabelShadowing) return null;
 		}
 		return null;
 	};
@@ -1814,7 +1813,9 @@
 				const theGoto = this.pendingGotos[i];
 
 				if (theGoto.maxDepth >= this.scopes.length && theGoto.target === name) {
-					if (theGoto.localCounts[this.scopes.length - 1] < scope.locals.length) {
+					if (
+						theGoto.localCounts[this.scopes.length - 1] < scope.locals.length
+					) {
 						scope.deferredGotos.push(theGoto);
 					}
 					continue;
@@ -1828,7 +1829,7 @@
 
 		scope.labels[name] = {
 			localCount: scope.locals.length,
-			line: token.line
+			line: token.line,
 		};
 	};
 
@@ -1892,7 +1893,7 @@
 		};
 
 	LoopFlowContext.prototype.addLocal =
-		LoopFlowContext.prototype.raiseDeferredErrors = () => { };
+		LoopFlowContext.prototype.raiseDeferredErrors = () => {};
 
 	function makeFlowContext() {
 		return features.labels ? new FullFlowContext() : new LoopFlowContext();
@@ -2262,14 +2263,14 @@
 	//        | 'local' Name {',' Name} ['=' exp {',' exp}]
 	function parseAttribute() {
 		markLocation();
-		if (consume('<')) {
+		if (consume("<")) {
 			const identifier = token.value;
-			if (Identifier !== token.type) raiseUnexpectedToken('<name>', token);
+			if (Identifier !== token.type) raiseUnexpectedToken("<name>", token);
 
 			if (!features.attributes[identifier])
 				raise(token, errors.unknownAttribute, identifier);
 			next();
-			expect('>');
+			expect(">");
 			return finishNode(ast.attribute(identifier));
 		}
 		if (trackLocations) locations.pop();
@@ -2297,7 +2298,9 @@
 
 				if (attribute !== null) {
 					if (trackLocations) pushLocation(marker);
-					variables.push(finishNode(ast.identifierWithAttribute(name.name, attribute)));
+					variables.push(
+						finishNode(ast.identifierWithAttribute(name.name, attribute)),
+					);
 					// console.log(variables);
 				} else {
 					variables.push(name);
@@ -2378,7 +2381,7 @@
 				return unexpected(token);
 			}
 
-			both: for (; ;) {
+			both: for (;;) {
 				switch (StringLiteral === token.type ? '"' : token.value) {
 					case ".":
 					case "[":
@@ -2448,12 +2451,12 @@
 
 	//     Identifier ::= Name
 
-	function parseIdentifier() {
+	function parseIdentifier(isIndex = false) {
 		markLocation();
 		const identifier = token.value;
 		if (Identifier !== token.type) raiseUnexpectedToken("<name>", token);
 		next();
-		return finishNode(ast.identifier(identifier));
+		return finishNode(ast.identifier(identifier, isIndex));
 	}
 
 	// Parse the functions parameters and body block. The name should already
@@ -2752,12 +2755,12 @@
 				case ".":
 					pushLocation(marker);
 					next();
-					identifier = parseIdentifier();
+					identifier = parseIdentifier(true);
 					return finishNode(ast.memberExpression(base, ".", identifier));
 				case "?.":
 					pushLocation(marker);
 					next();
-					identifier = parseIdentifier();
+					identifier = parseIdentifier(true);
 					return finishNode(ast.memberExpression(base, "?.", identifier));
 				case "?[":
 					pushLocation(marker);
@@ -2768,7 +2771,7 @@
 				case ":":
 					pushLocation(marker);
 					next();
-					identifier = parseIdentifier();
+					identifier = parseIdentifier(true);
 					base = finishNode(ast.memberExpression(base, ":", identifier));
 					// Once a : is found, this has to be a CallExpression, otherwise
 					// throw an error.
@@ -2809,7 +2812,7 @@
 		}
 
 		// The suffix
-		for (; ;) {
+		for (;;) {
 			const newBase = parsePrefixExpressionPart(base, marker, flowContext);
 			if (newBase === null) break;
 			base = newBase;
@@ -2926,8 +2929,8 @@
 	exports.parse = parse;
 
 	const versionFeatures = {
-		"5.1": {},
-		"5.2": {
+		5.1: {},
+		5.2: {
 			labels: true,
 			emptyStatement: true,
 			hexEscapes: true,
@@ -2935,7 +2938,7 @@
 			strictEscapes: true,
 			relaxedBreak: true,
 		},
-		"5.3": {
+		5.3: {
 			labels: true,
 			emptyStatement: true,
 			hexEscapes: true,
@@ -2946,7 +2949,7 @@
 			integerDivision: true,
 			relaxedBreak: true,
 		},
-		"5.4": {
+		5.4: {
 			labels: true,
 			emptyStatement: true,
 			hexEscapes: true,
@@ -2961,7 +2964,7 @@
 			joatHashes: true,
 			relaxedUTF8: true,
 			noLabelShadowing: true,
-			attributes: { 'const': true, 'close': true },
+			attributes: { const: true, close: true },
 		},
 
 		LuaJIT: {
